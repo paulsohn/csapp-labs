@@ -1,7 +1,7 @@
 /* 
  * CS:APP Data Lab 
  * 
- * <Please put your name and userid here>
+ * Paul Sohn
  * 
  * bits.c - Source file with your solutions to the Lab.
  *          This is the file you will hand in to your instructor.
@@ -143,7 +143,12 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+  int a = x & (~y);
+  int b = (~x) & y;
+  return ~(~a & ~b);
+  // int a = ~(~x & ~y);
+  // int b = x & y;
+  // return a & ~b;
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -152,8 +157,7 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
+  return 1 << 31;
 
 }
 //2
@@ -165,7 +169,10 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+  int a = !(~x); // 1 when x == -1
+  int b = (~(x+1))^x; // 1 unless x == -1 or x == Tmax
+  return !(a | b);
+  // for answers like !(x + x + 2) & !!(x + 1), the compiler optimizes it without mercy and just give 0.
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -176,7 +183,11 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  x = x & (x >> 16);
+  x = x & (x >> 8);
+  x = x & (x >> 4);
+  x = x & (x >> 2);
+  return (x & 2) >> 1;
 }
 /* 
  * negate - return -x 
@@ -186,7 +197,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return (~x) + 1;
 }
 //3
 /* 
@@ -199,7 +210,9 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  int a = !((x ^ 0x30) >> 3); //0x30 ~ 0x37
+  int b = !((x ^ 0x38) >> 1); //0x38 ~ 0x39
+  return a | b;
 }
 /* 
  * conditional - same as x ? y : z 
@@ -209,7 +222,8 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  int f = (!x) + (~0); //(!x) - 1 was fine if subtraction allowed..
+  return (f & y) | (~f & z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -219,7 +233,14 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  int msb = 1 << 31;
+  int sx = x & msb;
+  int sy = y & msb;
+  int a = !!(sx & ~sy);               // if a set, then x < 0 <= y. (ths is the only case when y - x possibly overflow.)
+  int b = !(~sx & sy);                // if b not set, then x >= 0 > y. (ths is the only case when y - x possibly underflow.)
+  int c = !((y + (~x) + 1) & msb);    // if c set, then y - x don't have msb. (i.e. y-x >= 0 or overflown or underflown)
+
+  return a | (b & c);
 }
 //4
 /* 
@@ -231,7 +252,17 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+  x = x | (x >> 16); // 1 if all bits are 0, 0 if at least one bit is 1
+  x = x | (x >> 8);
+  x = x | (x >> 4);
+  x = x | (x >> 2);
+  x = x | (x >> 1);
+  return (~x) & 1; // it saturated the max ops!!
+
+  // impressive solution after this: x is zero iff sign bit of x and -x are both zero.
+  // int a = x >> 31;        // all bits set to sign bit of x
+  // int b = (~x + 1) >> 31; // all bits set to sign bit of -x
+  // return (a | b) + 1;     // 1 only when sign bit of x and -x are both zero, 0 otherwise.
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -246,7 +277,75 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  // if x positive, return the highest bit idx + 2
+  // if x zero, return 1
+  // if x negative, return (the minimum number of bits for |x|) + 1 ... except when |x| is the power of 2.
+  // so just (the minimum number of bits for |x|-1 which is ~x)
+
+  // or to treat all cases equally, start with 2*(x or ~x) + 1 and return the highest bit idx + 1.
+
+  // finding if there is a bit >= 16th in y ->
+  // next step : if bit >= 16 exists in y, use y >> 16. else use y. find if there is a bit >= 8th in it.
+
+  int r = 0, z;
+  int minusone = ~0;
+  int f = x >> 31;
+
+  int y = ((f ^ x) << 1) | 1;
+  
+  // since right shift for signed int is arithmetic,
+  // it is semantically more precise to take the least 16 bits only.
+  // however it is irrelavent with the functionality itself;
+  // if the MSB has been shifted down, then there actually IS the >=16th, >=8th, ... bit we're looking for.
+  z = y >> 16;
+  f = !z + minusone;  //if bit >= 16th exists then 1...1, otherwise 0. equivalent to !!z (except that it's 1, not 1..1) actually...
+  r = r | (f & 16);
+  y = (~f & y) | (f & z);
+
+  z = y >> 8;
+  f = !z + minusone;
+  r = r | (f & 8);
+  y = (~f & y) | (f & z);
+
+  z = y >> 4;
+  f = !z + minusone;
+  r = r | (f & 4);
+  y = (~f & y) | (f & z);
+
+  z = y >> 2;
+  f = !z + minusone;
+  r = r | (f & 2);
+  y = (~f & y) | (f & z);
+
+  z = (y >> 1);
+  f = !z + minusone;
+  r = r | (f & 1);
+
+  return r + 1;
+
+  // more compact solution:
+  // int b, r = 0;
+  // x = ((x ^ (x >> 31)) << 1) | 1;
+
+  // b = !!(x >> 16) << 4; // 16 if there is >=16th bit, 0 otherwise.
+  // r = r | b;
+  // x = x >> b;
+
+  // b = !!(x >> 8) << 3;
+  // r = r | b;
+  // x = x >> b;
+
+  // b = !!(x >> 4) << 2;
+  // r = r | b;
+  // x = x >> b;
+
+  // b = !!(x >> 2) << 1;
+  // r = r | b;
+  // x = x >> b;
+
+  // b = !!(x >> 1) << 0;
+  // r = r | b;
+  // return r + 1;
 }
 //float
 /* 
@@ -261,7 +360,17 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  unsigned sgn = uf >> 31;
+  unsigned pw = (uf >> 23) & 0xff;
+  unsigned sig = uf ^ (sgn << 31) ^ (pw << 23);
+
+  if(pw == 0xff){
+    return uf;
+  } else if(!pw){
+    return (sgn << 31) | (uf << 1);
+  } else{
+    return (sgn << 31) | ((pw+1) << 23) | sig;
+  }
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -276,7 +385,26 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  int r = 0;
+  unsigned sgn = uf >> 31;
+  unsigned pw = (uf >> 23) & 0xff;
+  int spw = pw - 0x7f;
+  unsigned sig = uf ^ (sgn << 31) ^ (pw << 23);
+  sig = sig + (1 << 23);
+
+  if(spw < 0){
+    return 0;
+  } else if(spw < 23){
+    r = (sig >> (23 - spw));
+    if(sgn) return -r;
+    else return r;
+  } else if(spw < 31){
+    r = (sig << (spw - 23));
+    if(sgn) return -r;
+    else return r;
+  } else{
+    return 0x80000000u;
+  }
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -292,5 +420,13 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  if(x < - 0x7f - 22){
+    return 0;
+  } else if(x <= -0x7f){
+    return 1 << (x + 0x7f + 22); //denorm
+  } else if(x < 0x80){
+    return (x + 0x7f) << 23;
+  } else{
+    return 0xff << 23; // +INF
+  }
 }
